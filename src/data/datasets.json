@@ -744,7 +744,7 @@
         "id": 2,
         "title": "問題１",
         "description": "【第189問】",
-        "initialSfen": "9/4R1pk1/9/7G1/9/9/9/9/9 b Gr2b2g4s4n4l17p 1"
+        "initialSfen": "9/4R1Pk1/9/7G1/9/9/9/9/9 b Gr2b2g4s4n4l17p 1"
       },
       {
         "id": 3,
@@ -858,7 +858,7 @@
         "id": 21,
         "title": "問題２０",
         "description": "【第208問】",
-        "initialSfen": "9/9/9/5R3/6k2/9/9/6N2/9 b RL2b4g4s3n3l18p 1"
+        "initialSfen": "9/9/9/6R2/7k1/9/9/7N1/9 b RL2b4g4s3n3l18p 1"
       },
       {
         "id": 22,
