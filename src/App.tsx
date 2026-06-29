@@ -1348,10 +1348,10 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
   if (isLoadingProblems) {
     return (
-      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
+      <div className="min-h-screen bg-[#1A2F24] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-amber-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-amber-800 font-bold">問題データを読み込み中...</p>
+          <p className="text-white font-bold">問題データを読み込み中...</p>
         </div>
       </div>
     );
@@ -1359,11 +1359,11 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#1A2F24] flex items-center justify-center p-4">
         <div className="bg-white p-8 rounded-2xl shadow-xl border border-red-100 text-center max-w-md">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-amber-950 mb-2">エラーが発生しました</h1>
-          <p className="text-amber-800/70 mb-6">{error}</p>
+          <h1 className="text-2xl font-bold text-stone-900 mb-2">エラーが発生しました</h1>
+          <p className="text-stone-800/70 mb-6">{error}</p>
           <div className="flex flex-col gap-3">
             <button onClick={() => window.location.reload()} className="bg-amber-800 text-white px-6 py-2 rounded-xl font-bold hover:bg-amber-900 transition-colors">
               再読み込み
@@ -1389,10 +1389,10 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
   if (!shogi) {
     return (
-      <div className="min-h-screen bg-[#fdf6e3] flex items-center justify-center">
+      <div className="min-h-screen bg-[#1A2F24] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-amber-800 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-amber-800 font-bold">読み込み中...</p>
+          <p className="text-white font-bold">読み込み中...</p>
         </div>
       </div>
     );
@@ -1644,8 +1644,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
             key={`${x}-${y}`}
             onClick={() => handleSquareClick(x, y)}
             className={`
-              relative w-full aspect-square border border-amber-800/30 flex items-center justify-center cursor-pointer
-              ${isSelected ? 'bg-amber-400/50' : isLastMove ? 'bg-amber-200/40' : 'hover:bg-amber-100/30'}
+              relative w-full aspect-square border border-[#4A3123] flex items-center justify-center cursor-pointer
+              ${isSelected ? 'bg-blue-400/50' : isLastMove ? 'bg-blue-300/40' : 'hover:bg-black/10'}
               transition-colors duration-200
             `}
           >
@@ -1658,16 +1658,14 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                 <div
                   className={`
                     w-full h-full flex items-center justify-center rounded shadow-sm
-                    ${piece.color === Color.Black 
-                      ? 'bg-white border border-amber-800/30' 
-                      : 'border border-transparent'
-                    }
+                    ${piece.color === Color.Black ? 'bg-stone-50' : 'bg-[#F5D799]'} border border-stone-700/50
                     transition-all duration-200
                   `}
                 >
                   <span className={`
                     text-xl sm:text-2xl md:text-3xl font-bold select-none
-                    ${piece.color === Color.White ? 'rotate-180 text-amber-900' : 'text-amber-950'}
+                    ${piece.color === Color.White ? 'rotate-180' : ''}
+                    ${["TO", "NY", "NK", "NG", "UM", "RY"].includes(piece.kind) ? 'text-red-700' : 'text-stone-900'}
                   `}>
                     {PIECE_NAMES[piece.kind] || piece.kind}
                   </span>
@@ -1691,23 +1689,24 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
     return (
       <div className="flex flex-row flex-wrap gap-1 sm:gap-2 items-center justify-center">
-        {!isEditMode && pieces.length === 0 && <span className="text-amber-800/40 text-[10px] sm:text-sm italic py-2">なし</span>}
+        {!isEditMode && pieces.length === 0 && <span className="text-black text-[10px] sm:text-sm py-2">なし</span>}
         {pieces.map(([kind, count]) => (
           <div key={kind} className="flex flex-col items-center gap-1">
             <div
               onClick={() => !isEditMode && handleHandClick(kind as string, color)}
               className={`
                 relative flex items-center justify-center rounded
-                ${color === Color.Black ? 'w-[10vw] max-w-[46px] h-[10vw] max-h-[46px] cursor-pointer border border-amber-800/30 bg-white/80 hover:bg-amber-100 shadow-sm' : 'w-8 h-8 sm:w-10 sm:h-10 bg-transparent'}
-                ${selectedHandPiece?.piece === kind && selectedHandPiece?.color === color ? '!bg-amber-400/50' : ''}
+                ${color === Color.Black ? 'w-[10vw] max-w-[46px] h-[10vw] max-h-[46px]' : 'w-8 h-8 sm:w-10 sm:h-10'}
+                cursor-pointer border border-stone-700/50 ${color === Color.Black ? 'bg-stone-50 hover:bg-white' : 'bg-[#F5D799] hover:bg-[#ebd095]'} shadow-sm
+                ${selectedHandPiece?.piece === kind && selectedHandPiece?.color === color ? '!ring-2 !ring-blue-500' : ''}
                 transition-all duration-200
               `}
             >
-              <span className={`font-bold ${color === Color.White ? 'text-lg sm:text-xl rotate-180 text-amber-900' : 'text-xl sm:text-2xl md:text-3xl text-amber-950'} ${isEditMode && count === 0 ? 'opacity-30' : ''}`}>
+              <span className={`font-bold ${color === Color.White ? 'text-lg sm:text-xl rotate-180' : 'text-xl sm:text-2xl md:text-3xl'} text-stone-900 ${isEditMode && count === 0 ? 'opacity-30' : ''}`}>
                 {PIECE_NAMES[kind as string] || kind}
               </span>
               {(count as number) > 1 && (
-                <span className={`absolute -bottom-1 -right-1 text-[10px] sm:text-xs w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full border border-white ${color === Color.White ? 'bg-amber-900 text-white' : 'bg-amber-800 text-white'}`}>
+                <span className={`absolute -bottom-1 -right-1 text-[10px] sm:text-xs w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full border border-white bg-stone-800 text-white`}>
                   {count as number}
                 </span>
               )}
@@ -1739,7 +1738,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
   };
 
   return (
-    <div className="h-[100dvh] bg-[#fdf6e3] text-amber-950 font-sans flex flex-col items-center overflow-hidden relative">
+    <div className="h-[100dvh] bg-[#1A2F24] text-stone-900 font-sans flex flex-col items-center overflow-hidden relative">
       {/* Custom Modals */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -1781,14 +1780,14 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         </div>
       )}
 
-      <div className="w-full bg-amber-200 py-2 px-4 flex justify-center items-center border-b-2 border-amber-900/20 shrink-0 shadow-sm">
-        <span className="text-amber-950 font-black text-base sm:text-lg tracking-wide">{appTitle}</span>
+      <div className="w-full bg-[#2A4C3A] py-2 px-4 flex justify-center items-center border-b-2 border-black/20 shrink-0 shadow-sm">
+        <span className="text-white font-black text-base sm:text-lg tracking-wide">{appTitle}</span>
       </div>
-      <header className="w-full flex-none px-2 sm:px-4 py-2 flex items-center justify-between shadow-sm z-10 bg-white/50 backdrop-blur-sm border-b border-amber-900/10">
+      <header className="w-full flex-none px-2 sm:px-4 py-2 flex items-center justify-between shadow-sm z-10 bg-[#1A2F24] text-white border-b border-black/20">
         <button
           onClick={() => setCurrentProblemIndex(prev => Math.max(0, prev - 10))}
           disabled={currentProblemIndex === 0}
-          className="p-1 sm:p-2 rounded-full hover:bg-amber-200 disabled:opacity-30 transition-colors"
+          className="p-1 sm:p-2 rounded-full hover:bg-white/20 disabled:opacity-30 transition-colors"
           title="10問戻る"
         >
           <ChevronsLeft className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1798,17 +1797,17 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
           <button
             onClick={() => setCurrentProblemIndex(prev => Math.max(0, prev - 1))}
             disabled={currentProblemIndex === 0}
-            className="p-1 sm:p-2 rounded-full hover:bg-amber-200 disabled:opacity-30 transition-colors"
+            className="p-1 sm:p-2 rounded-full hover:bg-white/20 disabled:opacity-30 transition-colors"
             title="前の問題"
           >
             <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
           
           <div className="flex justify-center items-center gap-2 sm:gap-4 mx-1 sm:mx-2">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-amber-900 whitespace-nowrap">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-white whitespace-nowrap">
               {solvedProblems.includes(currentProblem.id) ? '🔴 ' : ''}{currentProblem.title}
             </h2>
-            <span className="font-bold px-3 py-1 bg-amber-200 rounded-full text-xs sm:text-sm whitespace-nowrap text-amber-900">
+            <span className="font-bold px-3 py-1 bg-[#2A4C3A] rounded-full text-xs sm:text-sm whitespace-nowrap text-white">
               問題 {currentProblemIndex + 1} / {problems.length}
             </span>
           </div>
@@ -1816,7 +1815,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
           <button
             onClick={goToNextProblem}
             disabled={!isRandomOrder && currentProblemIndex === problems.length - 1}
-            className="p-1 sm:p-2 rounded-full hover:bg-amber-200 disabled:opacity-30 transition-colors"
+            className="p-1 sm:p-2 rounded-full hover:bg-white/20 disabled:opacity-30 transition-colors"
             title="次の問題"
           >
             <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1826,7 +1825,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         <button
           onClick={() => setCurrentProblemIndex(prev => Math.min(problems.length - 1, prev + 10))}
           disabled={currentProblemIndex === problems.length - 1}
-          className="p-1 sm:p-2 rounded-full hover:bg-amber-200 disabled:opacity-30 transition-colors"
+          className="p-1 sm:p-2 rounded-full hover:bg-white/20 disabled:opacity-30 transition-colors"
           title="10問進む"
         >
           <ChevronsRight className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -1837,8 +1836,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         <div className={`w-full max-w-lg flex flex-col gap-1 sm:gap-2 items-center justify-start pt-1 sm:pt-2 ${isEditMode ? 'overflow-visible h-auto min-h-full' : 'overflow-hidden h-full'}`}>
           {/* Gote Hand (Top) */}
             <div className="w-full max-w-full sm:max-w-[480px] flex flex-row px-0 sm:px-2">
-              <div className="w-full bg-amber-900/5 p-1 sm:p-3 rounded-lg sm:rounded-xl border border-amber-900/10 min-h-[40px] flex flex-row items-center gap-2 sm:gap-4">
-                <h3 className="text-xs sm:text-sm font-bold text-amber-900/60 whitespace-nowrap ml-1 sm:ml-0">後手</h3>
+              <div className="w-full bg-[#D1A15B] p-1 sm:p-3 rounded-lg sm:rounded-xl border border-[#D1A15B] min-h-[40px] flex flex-row items-center gap-2 sm:gap-4 shadow-sm">
+                <h3 className="text-xs sm:text-sm font-bold text-black whitespace-nowrap ml-1 sm:ml-0">後手</h3>
                 <div className="flex-1 flex flex-row justify-start flex-wrap">
                   {renderHand(Color.White)}
                 </div>
@@ -1847,13 +1846,13 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
             {/* Board */}
             <div className="flex flex-col items-center w-full">
-              <div className={`relative w-full max-w-[min(100vw-16px,50vh)] p-0 sm:p-2 sm:rounded-lg shadow-sm sm:shadow-2xl border-y-2 sm:border-4 flex-shrink-0 transition-colors ${isEditMode ? 'bg-amber-100 border-amber-500' : 'bg-amber-100 sm:bg-amber-200 border-amber-800/20 sm:border-amber-800/20'}`}>
+              <div className={`relative w-full max-w-[min(100vw-16px,50vh)] p-0 sm:p-2 sm:rounded-lg shadow-sm sm:shadow-2xl flex-shrink-0 transition-colors ${isEditMode ? 'bg-[#D1A15B] border-4 border-amber-500' : 'bg-[#D1A15B] border-2 sm:border-4 border-[#D1A15B]'}`}>
                 {isEditMode && (
-                  <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-[10px] sm:text-xs font-bold text-center py-0.5 sm:py-1 sm:rounded-t-sm z-10">
+                  <div className="absolute top-0 left-0 right-0 bg-stone-500 text-white text-[10px] sm:text-xs font-bold text-center py-0.5 sm:py-1 sm:rounded-t-sm z-10">
                     盤面編集モード
                   </div>
                 )}
-                <div className={`grid grid-cols-9 w-full bg-amber-50 border-2 border-amber-900 shadow-inner align-top ${isEditMode ? 'mt-4 sm:mt-4' : ''}`}>
+                <div className={`grid grid-cols-9 w-full bg-[#EFC07E] border-[4px] border-[#D1A15B] shadow-inner align-top ${isEditMode ? 'mt-4 sm:mt-4' : ''}`}>
                   {renderBoard()}
                 </div>
                 <AnimatePresence>
@@ -1877,8 +1876,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
             {/* Sente Hand (Bottom) */}
             <div className="w-full max-w-full sm:max-w-[480px] flex flex-row px-0 sm:px-2">
-              <div className="w-full bg-amber-900/5 p-1 sm:p-3 rounded-lg sm:rounded-xl border border-amber-900/10 min-h-[40px] flex flex-row items-center gap-2 sm:gap-4">
-                <h3 className="text-xs sm:text-sm font-bold text-amber-900/60 whitespace-nowrap ml-1 sm:ml-0">先手</h3>
+              <div className="w-full bg-[#D1A15B] p-1 sm:p-3 rounded-lg sm:rounded-xl border border-[#D1A15B] min-h-[40px] flex flex-row items-center gap-2 sm:gap-4 shadow-sm">
+                <h3 className="text-xs sm:text-sm font-bold text-black whitespace-nowrap ml-1 sm:ml-0">先手</h3>
                 <div className="flex-1 flex flex-row justify-center flex-wrap">
                   {renderHand(Color.Black)}
                 </div>
@@ -1886,9 +1885,9 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
             </div>
             
             {/* Message Area moved below Sente Hand */}
-            <div className={`
+              <div className={`
               w-full max-w-full sm:max-w-[480px] p-2 sm:p-4 rounded-lg sm:rounded-xl text-center font-bold text-sm sm:text-lg transition-all duration-300 mx-2 sm:mx-0 shadow-sm
-              ${isGameOver ? 'bg-green-100 text-green-800 scale-105' : 'bg-amber-100 border border-amber-200 text-amber-900'}
+              ${isGameOver ? 'bg-green-100 text-green-800 scale-105' : 'bg-[#FFF9E6] border border-[#E8DCC0] text-[#5A4A32]'}
             `}>
               {message === 'CORRECT' ? (
                 (isRandomOrder ? solvedProblems.length < problems.length : currentProblemIndex < problems.length - 1) ? (
@@ -1933,7 +1932,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
             {/* Comment Section below buttons */}
             <div className="w-full max-w-[600px] px-2 sm:px-0 mt-1 text-center z-10 shrink-0">
-              <p className="text-sm sm:text-base text-amber-950 truncate font-bold bg-white/60 p-2 sm:p-3 rounded-xl border border-amber-900/10 shadow-sm" title={currentProblem.description || "解説はありません"}>
+              <p className="text-sm sm:text-base text-stone-900 truncate font-bold bg-white/60 p-2 sm:p-3 rounded-xl border border-stone-800/10 shadow-sm" title={currentProblem.description || "解説はありません"}>
                 {currentProblem.description || "解説はありません"}
               </p>
             </div>
@@ -1941,15 +1940,15 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
           {/* Edit Palette */}
           {isEditMode && (
             <div className="w-full max-w-[600px] px-2 sm:px-0 flex flex-col gap-4">
-              <div className="bg-white/80 p-4 rounded-xl border border-amber-300 shadow-sm space-y-4">
+              <div className="bg-white/80 p-4 rounded-xl border border-stone-400 shadow-sm space-y-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <Edit2 size={20} className="text-amber-700" />
-                  <h3 className="font-bold text-amber-900">問題の設定と盤面編集</h3>
+                  <Edit2 size={20} className="text-stone-700" />
+                  <h3 className="font-bold text-stone-800">問題の設定と盤面編集</h3>
                 </div>
 
-                <div className="space-y-4 border-b border-amber-200 pb-4">
+                <div className="space-y-4 border-b border-stone-300 pb-4">
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-amber-700 block uppercase tracking-wider">問題タイトル</label>
+                    <label className="text-xs font-bold text-stone-700 block uppercase tracking-wider">問題タイトル</label>
                     <input
                       type="text"
                       value={currentProblem.title}
@@ -1961,12 +1960,12 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                         };
                         setProblems(updatedProblems);
                       }}
-                      className="w-full text-xl font-bold p-2 border border-amber-300 rounded-lg bg-white text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full text-xl font-bold p-2 border border-stone-400 rounded-lg bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500"
                       placeholder="問題のタイトルを入力"
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-amber-700 block uppercase tracking-wider">解説・ヒント</label>
+                    <label className="text-xs font-bold text-stone-700 block uppercase tracking-wider">解説・ヒント</label>
                     <textarea
                       value={currentProblem.description || ''}
                       onChange={(e) => {
@@ -1977,7 +1976,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                         };
                         setProblems(updatedProblems);
                       }}
-                      className="w-full p-3 border border-amber-300 rounded-xl bg-white text-amber-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full p-3 border border-stone-400 rounded-xl bg-white text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-500"
                       rows={3}
                       placeholder="問題の説明を入力してください"
                     />
@@ -1987,7 +1986,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                 <div className="flex flex-wrap gap-2 mb-4">
                   <button
                     onClick={() => setEditTool('eraser')}
-                    className={`px-3 py-1 rounded border text-sm ${editTool === 'eraser' ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-amber-100'}`}
+                    className={`px-3 py-1 rounded border text-sm ${editTool === 'eraser' ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-stone-200'}`}
                   >
                     消しゴム
                   </button>
@@ -1996,7 +1995,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       setEditTool(null);
                       setSelectedSquare(null);
                     }}
-                    className={`px-3 py-1 rounded border text-sm ${editTool === null ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-amber-100'}`}
+                    className={`px-3 py-1 rounded border text-sm ${editTool === null ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-stone-200'}`}
                   >
                     移動 / 反転
                   </button>
@@ -2004,13 +2003,13 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                 
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
-                    <div className="text-xs font-bold mb-1 text-amber-900">先手（黒）の駒を配置</div>
+                    <div className="text-xs font-bold mb-1 text-stone-800">先手（黒）の駒を配置</div>
                     <div className="flex flex-wrap gap-1">
                       {['FU', 'KY', 'KE', 'GI', 'KI', 'KA', 'HI', 'OU', 'TO', 'NY', 'NK', 'NG', 'UM', 'RY'].map(kind => (
                         <button
                           key={`black-${kind}`}
                           onClick={() => setEditTool({ kind, color: Color.Black })}
-                          className={`w-8 h-8 flex items-center justify-center border rounded text-sm ${editTool !== 'eraser' && editTool?.kind === kind && editTool?.color === Color.Black ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-amber-100'}`}
+                          className={`w-8 h-8 flex items-center justify-center border rounded text-sm ${editTool !== 'eraser' && editTool?.kind === kind && editTool?.color === Color.Black ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-stone-200'}`}
                         >
                           {PIECE_NAMES[kind]}
                         </button>
@@ -2018,13 +2017,13 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                     </div>
                   </div>
                   <div className="flex-1">
-                    <div className="text-xs font-bold mb-1 text-amber-900">後手（白）の駒を配置</div>
+                    <div className="text-xs font-bold mb-1 text-stone-800">後手（白）の駒を配置</div>
                     <div className="flex flex-wrap gap-1">
                       {['FU', 'KY', 'KE', 'GI', 'KI', 'KA', 'HI', 'OU', 'TO', 'NY', 'NK', 'NG', 'UM', 'RY'].map(kind => (
                         <button
                           key={`white-${kind}`}
                           onClick={() => setEditTool({ kind, color: Color.White })}
-                          className={`w-8 h-8 flex items-center justify-center border rounded text-sm ${editTool !== 'eraser' && editTool?.kind === kind && editTool?.color === Color.White ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-amber-100'}`}
+                          className={`w-8 h-8 flex items-center justify-center border rounded text-sm ${editTool !== 'eraser' && editTool?.kind === kind && editTool?.color === Color.White ? 'bg-amber-400 border-amber-600 font-bold' : 'bg-white hover:bg-stone-200'}`}
                         >
                           <span className="rotate-180">{PIECE_NAMES[kind]}</span>
                         </button>
@@ -2053,7 +2052,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         
         <button
           onClick={() => setShowProgressModal(true)}
-          className="mb-10 sm:mb-12 w-12 h-12 sm:w-14 sm:h-14 bg-amber-50 text-amber-900 border-2 border-amber-600 rounded-full shadow-lg flex items-center justify-center hover:bg-amber-100 hover:scale-105 active:scale-95 transition-all flex-shrink-0 pointer-events-auto"
+          className="mb-10 sm:mb-12 w-12 h-12 sm:w-14 sm:h-14 bg-stone-50 text-stone-800 border-2 border-amber-600 rounded-full shadow-lg flex items-center justify-center hover:bg-stone-200 hover:scale-105 active:scale-95 transition-all flex-shrink-0 pointer-events-auto"
           title="正解状況を見る"
         >
           <ListOrdered size={24} className="sm:scale-110" />
@@ -2083,11 +2082,11 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={e => e.stopPropagation()}
-              className="bg-[#fdf6e3] w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]"
+              className="bg-stone-100 w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]"
             >
-              <div className="p-4 border-b border-amber-900/10 flex justify-between items-center bg-white/50">
-                <h3 className="font-bold text-amber-900 text-lg">正解状況</h3>
-                <button onClick={() => setShowProgressModal(false)} className="p-2 bg-amber-100 rounded-full text-amber-900 hover:bg-amber-200 transition-colors">
+              <div className="p-4 border-b border-stone-800/10 flex justify-between items-center bg-white/50">
+                <h3 className="font-bold text-stone-800 text-lg">正解状況</h3>
+                <button onClick={() => setShowProgressModal(false)} className="p-2 bg-stone-200 rounded-full text-stone-800 hover:bg-stone-300 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -2103,12 +2102,12 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                           onClick={() => { setCurrentProblemIndex(i); setShowProgressModal(false); }} 
                           className={`
                             relative p-2 rounded-xl flex flex-col items-center justify-center border-2 transition-all shadow-sm
-                            ${isCurrent ? 'ring-2 ring-amber-500 ring-offset-2 ring-offset-[#fdf6e3]' : ''}
-                            ${isSolved ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' : 'bg-white border-amber-200 text-amber-900 hover:bg-amber-50'}
+                            ${isCurrent ? 'ring-2 ring-stone-500 ring-offset-2 ring-offset-[#fdf6e3]' : ''}
+                            ${isSolved ? 'bg-green-100 border-green-300 text-green-800 hover:bg-green-200' : 'bg-white border-stone-300 text-stone-800 hover:bg-stone-50'}
                           `}
                         >
                            <span className="text-sm font-bold">{i+1}</span>
-                           <div className={`text-xs mt-1 font-semibold ${isSolved ? 'text-green-700/80' : 'text-amber-700/80'}`}>
+                           <div className={`text-xs mt-1 font-semibold ${isSolved ? 'text-green-700/80' : 'text-stone-700/80'}`}>
                              {resetCount}回
                            </div>
                         </button>
@@ -2116,11 +2115,11 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                    })}
                  </div>
               </div>
-              <div className="p-4 bg-amber-50/50 border-t border-amber-900/10 flex items-center justify-center gap-8">
-                <span className="text-sm font-bold text-amber-800">
+              <div className="p-4 bg-stone-50/50 border-t border-stone-800/10 flex items-center justify-center gap-8">
+                <span className="text-sm font-bold text-stone-800">
                   正解：{solvedProblems.length}問 / {problems.length}
                 </span>
-                <span className="text-sm font-bold text-amber-800">
+                <span className="text-sm font-bold text-stone-800">
                   間違えた回数: {Object.values(resetCounts).reduce((a, b) => a + b, 0)}回
                 </span>
               </div>
@@ -2144,14 +2143,14 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-[#fdf6e3] rounded-t-3xl shadow-2xl overflow-y-auto"
+              className="absolute bottom-0 left-0 right-0 max-h-[85vh] bg-stone-100 rounded-t-3xl shadow-2xl overflow-y-auto"
               onClick={e => e.stopPropagation()}
             >
-              <div className="sticky top-0 bg-[#fdf6e3]/90 backdrop-blur pb-2 pt-4 px-6 border-b border-amber-900/10 flex justify-between items-center z-10">
-                <h2 className="font-bold text-amber-900 text-lg">ツール・設定</h2>
+              <div className="sticky top-0 bg-stone-100/90 backdrop-blur pb-2 pt-4 px-6 border-b border-stone-800/10 flex justify-between items-center z-10">
+                <h2 className="font-bold text-stone-800 text-lg">ツール・設定</h2>
                 <button
                   onClick={() => setIsToolbarOpen(false)}
-                  className="p-2 bg-amber-100 rounded-full text-amber-900 hover:bg-amber-200"
+                  className="p-2 bg-stone-200 rounded-full text-stone-800 hover:bg-stone-300"
                 >
                   <X size={20} />
                 </button>
@@ -2160,8 +2159,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               <div className="p-4 sm:p-6 space-y-6">
 
                 {/* App Title Setting */}
-                <section className="bg-white/60 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col gap-2">
-                  <label className="text-xs font-bold text-amber-700 uppercase tracking-wider block">アプリのタイトル</label>
+                <section className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-2">
+                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">アプリのタイトル</label>
                   <input
                     type="text"
                     value={appTitle}
@@ -2169,39 +2168,39 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       setAppTitle(e.target.value);
                       localStorage.setItem('tsumeShogiAppTitle', e.target.value);
                     }}
-                    className="w-full text-lg font-bold p-2 border border-amber-300 rounded-lg bg-white text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full text-lg font-bold p-2 border border-stone-400 rounded-lg bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500"
                     placeholder="アプリのタイトル"
                   />
                 </section>
 
                 {/* Info Column Restored */}
-                <section className="bg-white/60 p-4 sm:p-6 rounded-xl border border-amber-200 shadow-sm flex flex-col gap-4">
+                <section className="bg-white/60 p-4 sm:p-6 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
                   {isEditMode ? (
                     <div className="flex items-center justify-center p-4">
-                       <p className="text-amber-800 font-bold mb-2">盤面と情報を編集中...</p>
+                       <p className="text-stone-800 font-bold mb-2">盤面と情報を編集中...</p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-amber-800 leading-relaxed whitespace-pre-wrap border-b border-amber-900/10 pb-4">
+                      <p className="text-stone-800 leading-relaxed whitespace-pre-wrap border-b border-stone-800/10 pb-4">
                         {currentProblem.description}
                       </p>
                       <div className="flex justify-end">
                         <button 
                           onClick={toggleEditMode}
-                          className="flex items-center gap-1 text-sm px-4 py-2 rounded transition-colors bg-amber-200 text-amber-800 hover:bg-amber-300 font-bold shadow-sm"
+                          className="flex items-center gap-1 text-sm px-4 py-2 rounded transition-colors bg-stone-300 text-stone-800 hover:bg-amber-300 font-bold shadow-sm"
                           title="問題の設定と盤面を編集する"
                         >
                           <Edit2 size={16} /> 盤面・設定の編集
                         </button>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap pt-2">
-                        <button onClick={() => setShowInfo(!showInfo)} className="text-amber-600 hover:text-amber-800 flex items-center gap-1 text-sm font-bold bg-amber-100 px-2 py-1 rounded" title="ヒント">
+                        <button onClick={() => setShowInfo(!showInfo)} className="text-stone-600 hover:text-stone-800 flex items-center gap-1 text-sm font-bold bg-stone-200 px-2 py-1 rounded" title="ヒント">
                           <Info size={16} /> ヒント
                         </button>
-                        <button onClick={moveProblemUp} disabled={currentProblemIndex === 0} className="p-1 text-amber-600 hover:bg-amber-200 rounded disabled:opacity-30" title="前に移動"><ArrowUp size={16} /></button>
-                        <button onClick={moveProblemDown} disabled={currentProblemIndex === problems.length - 1} className="p-1 text-amber-600 hover:bg-amber-200 rounded disabled:opacity-30" title="後ろに移動"><ArrowDown size={16} /></button>
-                        <button onClick={renumberProblems} className="p-1 text-amber-600 hover:bg-amber-200 rounded" title="問題番号を順番通りに振り直す"><ListOrdered size={16} /></button>
-                        <button onClick={duplicateProblem} className="p-1 text-amber-600 hover:bg-amber-200 rounded" title="この問題を複製"><Copy size={16} /></button>
+                        <button onClick={moveProblemUp} disabled={currentProblemIndex === 0} className="p-1 text-stone-600 hover:bg-stone-300 rounded disabled:opacity-30" title="前に移動"><ArrowUp size={16} /></button>
+                        <button onClick={moveProblemDown} disabled={currentProblemIndex === problems.length - 1} className="p-1 text-stone-600 hover:bg-stone-300 rounded disabled:opacity-30" title="後ろに移動"><ArrowDown size={16} /></button>
+                        <button onClick={renumberProblems} className="p-1 text-stone-600 hover:bg-stone-300 rounded" title="問題番号を順番通りに振り直す"><ListOrdered size={16} /></button>
+                        <button onClick={duplicateProblem} className="p-1 text-stone-600 hover:bg-stone-300 rounded" title="この問題を複製"><Copy size={16} /></button>
                         <button onClick={deleteProblem} className="p-1 text-red-500 hover:bg-red-100 rounded" title="この問題を削除"><Trash2 size={16} /></button>
                       </div>
                     </>
@@ -2222,11 +2221,11 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                 </AnimatePresence>
 
                 {/* App Settings Section */}
-                <section className="bg-white/60 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col gap-4">
+                <section className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                      <span className="font-bold text-amber-900 text-sm">出題順ランダム</span>
-                      <span className="text-xs text-amber-700">ONにすると未正解の問題からランダムに出題します</span>
+                      <span className="font-bold text-stone-800 text-sm">出題順ランダム</span>
+                      <span className="text-xs text-stone-700">ONにすると未正解の問題からランダムに出題します</span>
                     </div>
                     <button
                       onClick={() => {
@@ -2234,7 +2233,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                         setIsRandomOrder(next);
                         localStorage.setItem('tsumeShogiRandomOrder', String(next));
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 ${isRandomOrder ? 'bg-amber-600' : 'bg-gray-300'}`}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-stone-500 focus:ring-offset-2 ${isRandomOrder ? 'bg-amber-600' : 'bg-gray-300'}`}
                     >
                       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isRandomOrder ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
@@ -2243,8 +2242,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
                 {/* In-App Data Section */}
                 <div className="w-full">
-                  <div className="bg-white/60 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col gap-4">
-                    <div className="flex items-center gap-2 text-amber-900">
+                  <div className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
+                    <div className="flex items-center gap-2 text-stone-800">
                       <Settings size={20} />
                       <span className="font-bold text-sm">アプリ内データ管理</span>
                     </div>
@@ -2261,7 +2260,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                     <div className="flex gap-2 w-full mt-2">
                       <button
                         onClick={copyAllDataSets}
-                        className="flex items-center justify-center gap-2 text-xs text-amber-700 hover:text-amber-900 bg-white px-2 py-1.5 rounded-md border border-amber-300 shadow-sm transition-colors flex-1"
+                        className="flex items-center justify-center gap-2 text-xs text-stone-700 hover:text-stone-800 bg-white px-2 py-1.5 rounded-md border border-stone-400 shadow-sm transition-colors flex-1"
                         title="保存済みデータセットをクリップボードにコピー"
                       >
                         <ClipboardCopy size={14} />
@@ -2276,7 +2275,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       />
                       <button
                         onClick={() => datasetsJsonFileInputRef.current?.click()}
-                        className="flex items-center justify-center gap-2 text-xs text-amber-700 hover:text-amber-900 bg-white px-2 py-1.5 rounded-md border border-amber-300 shadow-sm transition-colors flex-1"
+                        className="flex items-center justify-center gap-2 text-xs text-stone-700 hover:text-stone-800 bg-white px-2 py-1.5 rounded-md border border-stone-400 shadow-sm transition-colors flex-1"
                         title="保存済みデータセットをインポート"
                       >
                         <Download size={14} />
@@ -2286,13 +2285,13 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
                     {savedDataSets.length > 0 && (
                       <div className="flex flex-col gap-2 mt-2">
-                        <span className="text-xs font-bold text-amber-700">保存済みデータ（クリックで読み込み）:</span>
+                        <span className="text-xs font-bold text-stone-700">保存済みデータ（クリックで読み込み）:</span>
                         <div className="max-h-40 overflow-y-auto pr-1 flex flex-col gap-2">
                           {savedDataSets.map((ds) => (
-                            <div key={ds.id} className="flex items-center justify-between bg-white px-3 py-2 rounded-md border border-amber-200 shadow-sm text-sm hover:border-amber-400 cursor-pointer transition-colors" onClick={() => loadDataSet(ds)}>
+                            <div key={ds.id} className="flex items-center justify-between bg-white px-3 py-2 rounded-md border border-stone-300 shadow-sm text-sm hover:border-amber-400 cursor-pointer transition-colors" onClick={() => loadDataSet(ds)}>
                               <div className="flex flex-col overflow-hidden">
-                                <span className="font-bold text-amber-900 truncate">{ds.title}</span>
-                                <span className="text-xs text-amber-600 line-clamp-1 truncate">{ds.problems.length}問</span>
+                                <span className="font-bold text-stone-800 truncate">{ds.title}</span>
+                                <span className="text-xs text-stone-600 line-clamp-1 truncate">{ds.problems.length}問</span>
                               </div>
                               <button
                                 onClick={(e) => { e.stopPropagation(); deleteDataSet(ds.id); }}
@@ -2311,8 +2310,8 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
                 {/* Upload Section */}
                 <div className="w-full mt-4">
-                  <div className="bg-white/60 p-4 rounded-xl border border-amber-200 shadow-sm flex flex-col items-center justify-between gap-4">
-                    <div className="flex flex-col items-start gap-4 text-amber-900 w-full">
+                  <div className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col items-center justify-between gap-4">
+                    <div className="flex flex-col items-start gap-4 text-stone-800 w-full">
                       <div className="flex items-center gap-2">
                         <Upload size={20} />
                         <span className="font-bold text-sm">問題を追加・エクスポートする</span>
@@ -2321,7 +2320,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       <div className="flex flex-wrap gap-2 w-full">
                         <button
                           onClick={copyAllData}
-                          className="flex items-center justify-center gap-2 text-sm text-amber-700 hover:text-amber-900 bg-white px-3 py-1.5 rounded-md border border-amber-300 shadow-sm transition-colors flex-1"
+                          className="flex items-center justify-center gap-2 text-sm text-stone-700 hover:text-stone-800 bg-white px-3 py-1.5 rounded-md border border-stone-400 shadow-sm transition-colors flex-1"
                           title="現在の問題データをクリップボードにコピー"
                         >
                           <ClipboardCopy size={16} />
@@ -2337,7 +2336,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                         />
                         <button
                           onClick={() => jsonFileInputRef.current?.click()}
-                          className="flex items-center justify-center gap-2 text-sm text-amber-700 hover:text-amber-900 bg-white px-3 py-1.5 rounded-md border border-amber-300 shadow-sm transition-colors flex-1"
+                          className="flex items-center justify-center gap-2 text-sm text-stone-700 hover:text-stone-800 bg-white px-3 py-1.5 rounded-md border border-stone-400 shadow-sm transition-colors flex-1"
                           title="JSONファイルから問題データをインポート"
                         >
                           <Download size={16} />
@@ -2369,10 +2368,10 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                         </button>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-4 w-full mt-2 pt-4 border-t border-amber-900/10">
+                    <div className="flex flex-col gap-4 w-full mt-2 pt-4 border-t border-stone-800/10">
                       <button
                         onClick={handleAddEmptyProblem}
-                        className="w-full flex items-center justify-center gap-2 bg-amber-100 text-amber-900 px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition-colors"
+                        className="w-full flex items-center justify-center gap-2 bg-stone-200 text-stone-800 px-4 py-2 rounded-lg font-bold hover:bg-stone-300 transition-colors"
                       >
                         <Plus size={18} />
                         空の盤面を追加
@@ -2387,7 +2386,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
-                        className="w-full flex items-center justify-center gap-2 bg-amber-100 text-amber-900 px-4 py-2 rounded-lg font-bold hover:bg-amber-200 transition-colors disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 bg-stone-200 text-stone-800 px-4 py-2 rounded-lg font-bold hover:bg-stone-300 transition-colors disabled:opacity-50"
                       >
                         {isUploading ? (
                           <Loader2 size={18} className="animate-spin" />
@@ -2426,7 +2425,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               exit={{ scale: 0.9 }}
               className="bg-white p-8 rounded-2xl shadow-2xl flex flex-col items-center gap-6 max-w-sm w-full"
             >
-              <h3 className="text-2xl font-bold text-amber-900">成りますか？</h3>
+              <h3 className="text-2xl font-bold text-stone-800">成りますか？</h3>
               <div className="flex gap-4 w-full">
                 <button
                   onClick={() => {
@@ -2476,15 +2475,15 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.9, y: 20 }}
-              className="bg-[#fdf6e3] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-amber-200 flex flex-col max-h-[80vh]"
+              className="bg-[#FDF6E2] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-[#EBE4D3] flex flex-col max-h-[80vh]"
             >
-              <div className="p-4 sm:p-6 pb-2 border-b border-amber-900/10">
-                <h2 className="text-xl font-bold text-amber-900 text-center">どの問題を解きますか？</h2>
+              <div className="p-4 sm:p-6 pb-2 border-b border-stone-800/10">
+                <h2 className="text-xl font-bold text-stone-800 text-center">どの問題を解きますか？</h2>
               </div>
-              <div className="px-4 py-3 sm:px-6 bg-[#fdf6e3] border-b border-amber-900/10 flex items-center justify-between">
+              <div className="px-4 py-3 sm:px-6 bg-[#FDF6E2] border-b border-stone-800/10 flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="font-bold text-amber-900 text-sm">出題順ランダム</span>
-                  <span className="text-xs text-amber-700 mt-0.5">ONにすると最初の問題もランダムに選びます</span>
+                  <span className="font-bold text-stone-800 text-sm">出題順ランダム</span>
+                  <span className="text-xs text-stone-700 mt-0.5">ONにすると最初の問題もランダムに選びます</span>
                 </div>
                 <button
                   onClick={() => {
@@ -2492,13 +2491,13 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                     setIsRandomOrder(next);
                     localStorage.setItem('tsumeShogiRandomOrder', String(next));
                   }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 flex-shrink-0 ${isRandomOrder ? 'bg-amber-600' : 'bg-gray-300'}`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-stone-500 focus:ring-offset-2 flex-shrink-0 ${isRandomOrder ? 'bg-amber-600' : 'bg-gray-300'}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isRandomOrder ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
               <div className="p-4 sm:p-6 overflow-y-auto flex-1 flex flex-col gap-3">
-                <span className="text-sm font-bold text-amber-700">保存済みデータから選ぶ:</span>
+                <span className="text-sm font-bold text-stone-700">保存済みデータから選ぶ:</span>
                 <div className="flex flex-col gap-2">
                   {savedDataSets.map((ds) => (
                     <button
@@ -2506,15 +2505,15 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       onClick={() => {
                         loadDataSetFromStartup(ds);
                       }}
-                      className="flex flex-col items-start bg-white px-4 py-3 rounded-lg border border-amber-200 shadow-sm hover:border-amber-400 hover:bg-amber-50 transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="flex flex-col items-start bg-white px-4 py-3 rounded-lg border border-stone-300 shadow-sm hover:border-amber-400 hover:bg-stone-50 transition-colors w-full text-left focus:outline-none focus:ring-2 focus:ring-stone-500"
                     >
-                      <span className="font-bold text-amber-900 text-base">{ds.title}</span>
-                      <span className="text-xs text-amber-600 mt-1">{ds.problems.length}問収録</span>
+                      <span className="font-bold text-stone-800 text-base">{ds.title}</span>
+                      <span className="text-xs text-stone-600 mt-1">{ds.problems.length}問収録</span>
                     </button>
                   ))}
                 </div>
               </div>
-              <div className="p-4 bg-amber-50 border-t border-amber-200 flex justify-center">
+              <div className="p-4 bg-[#FDF6E2] border-t border-stone-300 flex justify-center">
                 <button
                   onClick={() => {
                     if (savedDataSets.length > 0) {
@@ -2525,7 +2524,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       setCurrentProblemIndex(0);
                     }
                   }}
-                  className="px-6 py-2 bg-white border border-amber-300 text-amber-800 font-bold rounded-lg hover:bg-amber-100 transition-colors shadow-sm"
+                  className="px-6 py-2 bg-white border border-stone-400 text-stone-800 font-bold rounded-lg hover:bg-stone-200 transition-colors shadow-sm"
                 >
                   ランダムで選択
                 </button>
