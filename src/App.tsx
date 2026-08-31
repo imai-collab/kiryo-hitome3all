@@ -4,534 +4,31 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import * as ShogiModule from 'shogi.js';
 import confetti from 'canvas-confetti';
-import { Trophy, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Info, AlertCircle, Upload, Plus, Loader2, Edit2, Check, ArrowUp, ArrowDown, Trash2, ListOrdered, Copy, ClipboardCopy, Download, Settings, X, Menu } from 'lucide-react';
+import {
+  Trophy, RotateCcw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
+  Info, AlertCircle, Upload, Plus, Loader2, Edit2, Check, ArrowUp, ArrowDown,
+  Trash2, ListOrdered, Copy, ClipboardCopy, Download, Settings, X, Menu,
+  Eye, Image, FileImage, ExternalLink
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from '@google/genai';
-import { solveTsumeShogi, Move as SolverMove } from './lib/solver';
+import { Color, Position, Move, Problem, DataSet } from './types';
+import {
+  Shogi, Piece, PIECE_NAMES, fillGoteHand, attachAnswerImages,
+  applyMoveToShogi, cloneShogi, compressImage, getLegalMoves, findBestDefenderMove
+} from './lib/shogiUtils';
+import { getIDBValue, setIDBValue } from './lib/db';
 import problemsData from './data/problems.json';
 import datasetsJson from './data/datasets.json';
 
-// Handle different export styles of shogi.js
-const Shogi = (ShogiModule as any).Shogi || (ShogiModule as any).default || ShogiModule;
-const Piece = (ShogiModule as any).Piece || (ShogiModule as any).default?.Piece;
-
-// Define Color locally to avoid import issues
-enum Color {
-  Black = 0,
-  White = 1,
-}
-
-// Piece display names (Kanji)
-const PIECE_NAMES: Record<string, string> = {
-  FU: '歩',
-  KY: '香',
-  KE: '桂',
-  GI: '銀',
-  KI: '金',
-  KA: '角',
-  HI: '飛',
-  OU: '玉',
-  TO: 'と',
-  NY: '杏',
-  NK: '圭',
-  NG: '全',
-  UM: '馬',
-  RY: '龍',
-};
-
-const fillGoteHand = (shogiObj: any) => {
-  const TOTAL_PIECES: Record<string, number> = { FU: 18, KY: 4, KE: 4, GI: 4, KI: 4, KA: 2, HI: 2 };
-  const counts: Record<string, number> = { FU: 0, KY: 0, KE: 0, GI: 0, KI: 0, KA: 0, HI: 0 };
-
-  for (let x = 1; x <= 9; x++) {
-    for (let y = 1; y <= 9; y++) {
-      const p = shogiObj.get(x, y);
-      if (p) {
-        let kind = p.kind;
-        if (['TO', 'NY', 'NK', 'NG'].includes(kind)) {
-          if (kind === 'TO') kind = 'FU';
-          if (kind === 'NY') kind = 'KY';
-          if (kind === 'NK') kind = 'KE';
-          if (kind === 'NG') kind = 'GI';
-        }
-        if (kind === 'UM') kind = 'KA';
-        if (kind === 'RY') kind = 'HI';
-        if (counts[kind] !== undefined) counts[kind]++;
-      }
-    }
-  }
-
-  const senteHand = shogiObj.getHandsSummary(Color.Black);
-  for (const kind in senteHand) {
-    if (counts[kind] !== undefined) counts[kind] += senteHand[kind];
-  }
-
-  const goteHand = shogiObj.getHandsSummary(Color.White);
-  for (const kind in goteHand) {
-    while (shogiObj.getHandsSummary(Color.White)[kind] > 0) {
-      shogiObj.popFromHand(kind, Color.White);
-    }
-  }
-
-  for (const kind in TOTAL_PIECES) {
-    const remaining = TOTAL_PIECES[kind] - counts[kind];
-    for (let i = 0; i < remaining; i++) {
-      shogiObj.pushToHand(new Piece('-' + kind));
-    }
-  }
-};
-
-interface Position {
-  x: number;
-  y: number;
-}
-
-interface Move {
-  from?: Position;
-  to: Position;
-  piece?: string;
-  promote?: boolean;
-}
-
-interface Problem {
-  id: number;
-  title: string;
-  description: string;
-  initialSfen: string; // SFEN format for initial board
-  solution?: Move[]; // Sequence of correct moves (user, response, user...)
-}
-
 const INITIAL_PROBLEMS: Problem[] = (problemsData as any).problems || ((problemsData as any).length ? problemsData : []) as Problem[];
-
-const applyMoveToShogi = (shogiObj: any, move: Move) => {
-  if (move.from) {
-    shogiObj.move(move.from.x, move.from.y, move.to.x, move.to.y, move.promote);
-  } else if (move.piece) {
-    shogiObj.drop(move.to.x, move.to.y, move.piece);
-  }
-};
-
-const cloneShogi = (shogiObj: any) => {
-  const newShogi = new Shogi();
-  const sfen = shogiObj.toSFENString ? shogiObj.toSFENString(1) : shogiObj.toSFEN(1);
-  if (newShogi.initializeFromSFENString) {
-    newShogi.initializeFromSFENString(sfen);
-  } else if (newShogi.initializeFromSFEN) {
-    newShogi.initializeFromSFEN(sfen);
-  }
-  return newShogi;
-};
-
-const getLegalMoves = (currentShogi: any, color: Color): Move[] => {
-  const legalMoves: Move[] = [];
-  
-  for (let x = 1; x <= 9; x++) {
-    for (let y = 1; y <= 9; y++) {
-      const boardPiece = currentShogi.get(x, y);
-      if (boardPiece && boardPiece.color === color) {
-        const pieceKind = boardPiece.kind;
-        const pieceColor = boardPiece.color;
-        const pseudoMoves = currentShogi.getMovesFrom(x, y);
-        
-        for (const pm of pseudoMoves) {
-          const isPromotionZone = (c: Color, row: number) => c === Color.Black ? row <= 3 : row >= 7;
-          const isPromoted = ["TO", "NY", "NK", "NG", "UM", "RY"].includes(pieceKind);
-          const canPromote = !isPromoted && 
-                             !['KI', 'OU', 'GY'].includes(pieceKind) &&
-                             (isPromotionZone(pieceColor, y) || isPromotionZone(pieceColor, pm.to.y));
-                             
-          const mustPromote = canPromote && (
-            (['FU', 'KY'].includes(pieceKind) && (pieceColor === Color.Black ? pm.to.y === 1 : pm.to.y === 9)) ||
-            (pieceKind === 'KE' && (pieceColor === Color.Black ? pm.to.y <= 2 : pm.to.y >= 8))
-          );
-
-          if (!mustPromote) {
-            const sfen1 = currentShogi.toSFENString(1);
-            try {
-              currentShogi.move(x, y, pm.to.x, pm.to.y, false);
-              if (!currentShogi.isCheck(color)) {
-                legalMoves.push({ from: { x, y }, to: { x: pm.to.x, y: pm.to.y }, promote: false });
-              }
-            } catch (e) {}
-            if (currentShogi.initializeFromSFENString) {
-              currentShogi.initializeFromSFENString(sfen1);
-            } else {
-              currentShogi.initializeFromSFEN(sfen1);
-            }
-          }
-
-          if (canPromote || mustPromote) {
-            const sfen2 = currentShogi.toSFENString(1);
-            try {
-              currentShogi.move(x, y, pm.to.x, pm.to.y, true);
-              if (!currentShogi.isCheck(color)) {
-                legalMoves.push({ from: { x, y }, to: { x: pm.to.x, y: pm.to.y }, promote: true });
-              }
-            } catch (e) {}
-            if (currentShogi.initializeFromSFENString) {
-              currentShogi.initializeFromSFENString(sfen2);
-            } else {
-              currentShogi.initializeFromSFEN(sfen2);
-            }
-          }
-        }
-      }
-    }
-  }
-
-  const drops = currentShogi.getDropsBy(color);
-  for (const drop of drops) {
-    if (color === Color.Black) {
-      if ((drop.kind === 'FU' || drop.kind === 'KY') && drop.to.y === 1) continue;
-      if (drop.kind === 'KE' && drop.to.y <= 2) continue;
-    } else {
-      if ((drop.kind === 'FU' || drop.kind === 'KY') && drop.to.y === 9) continue;
-      if (drop.kind === 'KE' && drop.to.y >= 8) continue;
-    }
-
-    if (drop.kind === 'FU') {
-      let hasPawn = false;
-      for (let y = 1; y <= 9; y++) {
-        const p = currentShogi.get(drop.to.x, y);
-        if (p && p.kind === 'FU' && p.color === color) {
-          hasPawn = true;
-          break;
-        }
-      }
-      if (hasPawn) continue;
-    }
-
-    const sfen = currentShogi.toSFENString(1);
-    try {
-      currentShogi.drop(drop.to.x, drop.to.y, drop.kind);
-      if (!currentShogi.isCheck(color)) {
-        legalMoves.push({ to: { x: drop.to.x, y: drop.to.y }, piece: drop.kind });
-      }
-    } catch (e) {}
-    if (currentShogi.initializeFromSFENString) {
-      currentShogi.initializeFromSFENString(sfen);
-    } else {
-      currentShogi.initializeFromSFEN(sfen);
-    }
-  }
-
-  return legalMoves;
-};
-
-const findBestDefenderMove = (currentShogi: any, maxDepth: number, solvedAiMovesMap: Record<string, Move[]>, preferredAiMovesMap: Record<string, Move>): { bestMove: Move | null, steps: number, mate: boolean, mateCount?: number, timeout?: boolean } => {
-  const memo = new Map<string, { steps: number, mate: boolean, bestMove: Move | null, mateCount?: number, timeout?: boolean }>();
-  const startTime = Date.now();
-  const TIME_LIMIT_MS = 3000;
-
-
-  function search(depth: number, isBlack: boolean): { steps: number, mate: boolean, bestMove: Move | null, mateCount?: number, timeout?: boolean } {
-    if (Date.now() - startTime > TIME_LIMIT_MS) {
-      return { steps: 0, mate: false, bestMove: null, mateCount: 0, timeout: true };
-    }
-
-    const sfen = currentShogi.toSFENString(1);
-    const hash = `${sfen}-${depth}-${isBlack}`;
-    if (memo.has(hash)) return memo.get(hash)!;
-
-    if (depth === 0) {
-      return { steps: 0, mate: false, bestMove: null, mateCount: 0 };
-    }
-
-    const color = isBlack ? Color.Black : Color.White;
-    let legalMoves = getLegalMoves(currentShogi, color);
-
-    if (!isBlack && depth === maxDepth) {
-      const prefMove = preferredAiMovesMap[sfen];
-      if (prefMove) {
-        const isLegal = legalMoves.some(m => 
-          m.from?.x === prefMove.from?.x && m.from?.y === prefMove.from?.y && m.to.x === prefMove.to.x && m.to.y === prefMove.to.y && m.piece === prefMove.piece && m.promote === prefMove.promote
-        );
-        if (isLegal) {
-          return { steps: 1, mate: false, bestMove: prefMove, mateCount: 0, timeout: false };
-        }
-      }
-    }
-
-    // Sort moves to evaluate promising moves first, avoiding timeout with obscure moves
-    const PIECE_VALUES: Record<string, number> = {
-      FU: 1, KY: 3, KE: 4, GI: 6, KI: 7, KA: 10, HI: 12,
-      TO: 7, NY: 7, NK: 7, NG: 7, UM: 12, RY: 14, OU: 1000
-    };
-    let goteKingPos = { x: 5, y: 1 };
-    let senteKingPos = { x: 5, y: 9 };
-    for (let x = 1; x <= 9; x++) {
-      for (let y = 1; y <= 9; y++) {
-        const p = currentShogi.get(x, y);
-        if (p && p.kind === 'OU') {
-          if (p.color === Color.White) goteKingPos = { x, y };
-          else senteKingPos = { x, y };
-        }
-      }
-    }
-
-    const enemyKingPos = isBlack ? goteKingPos : senteKingPos;
-    const myKingPos = isBlack ? senteKingPos : goteKingPos;
-
-    legalMoves.sort((a, b) => {
-      const scoreMove = (m: Move) => {
-        let score = 0;
-        if (m.from) {
-          const captured = currentShogi.get(m.to.x, m.to.y);
-          if (captured) score += (PIECE_VALUES[captured.kind] || 1) * 20; // Captures are good
-          if (m.promote) score += 10;
-          
-          const piece = currentShogi.get(m.from.x, m.from.y);
-          if (piece && !isBlack) {
-            // Defense scaling
-            const distBefore = Math.abs(m.from.x - myKingPos.x) + Math.abs(m.from.y - myKingPos.y);
-            const distAfter = Math.abs(m.to.x - myKingPos.x) + Math.abs(m.to.y - myKingPos.y);
-            if (distAfter < distBefore) score += 5; // Moving closer to own king
-            if (piece.kind === 'OU') score += 15; // Give King moves higher exploration priority to avoid being starved by timeout
-          } else if (piece && isBlack) {
-             const distBefore = Math.abs(m.from.x - enemyKingPos.x) + Math.abs(m.from.y - enemyKingPos.y);
-             const distAfter = Math.abs(m.to.x - enemyKingPos.x) + Math.abs(m.to.y - enemyKingPos.y);
-             if (distAfter < distBefore) score += 5;
-          }
-        } else {
-          // Drops
-          score -= 10; // Penalty for using hand piece usually
-          const dropVal = PIECE_VALUES[m.piece!] || 1;
-          score += dropVal;
-          if (!isBlack) {
-             const dist = Math.abs(m.to.x - myKingPos.x) + Math.abs(m.to.y - myKingPos.y);
-             if (dist <= 2) score += 5; // Defending near king, lowered to not overshadow escaping
-          } else {
-             const dist = Math.abs(m.to.x - enemyKingPos.x) + Math.abs(m.to.y - enemyKingPos.y);
-             if (dist <= 2) score += 15;
-          }
-        }
-        return score + Math.random() * 5; // Add randomness to ensure different move ordering across evaluations prioritizing exploration uniformly
-      };
-      return scoreMove(b) - scoreMove(a);
-    });
-
-    if (isBlack) {
-      // 探索空間を減らすため、先手（プレイヤー）のシミュレーションは王手のみに絞る
-      legalMoves = legalMoves.filter(m => {
-        const s = currentShogi.toSFENString(1);
-        applyMoveToShogi(currentShogi, m);
-        const isCheck = currentShogi.isCheck(Color.White);
-        if (currentShogi.initializeFromSFENString) {
-          currentShogi.initializeFromSFENString(s);
-        } else {
-          currentShogi.initializeFromSFEN(s);
-        }
-        return isCheck;
-      });
-
-      if (legalMoves.length === 0) {
-        const res = { steps: 0, mate: false, bestMove: null, mateCount: 0 };
-        memo.set(hash, res);
-        return res;
-      }
-
-      let bestSteps = Infinity;
-      let bestMove: Move | null = null;
-      let evaluatedBlackMoves = 0;
-      let mateCount = 0;
-
-      let timeout = false;
-
-      for (const move of legalMoves) {
-        if (Date.now() - startTime > TIME_LIMIT_MS) {
-           timeout = true;
-           break;
-        }
-        evaluatedBlackMoves++;
-        
-        if (move.piece === 'FU') {
-           const s = currentShogi.toSFENString(1);
-           applyMoveToShogi(currentShogi, move);
-           const whiteMoves = getLegalMoves(currentShogi, Color.White);
-           if (currentShogi.initializeFromSFENString) {
-             currentShogi.initializeFromSFENString(s);
-           } else {
-             currentShogi.initializeFromSFEN(s);
-           }
-           if (whiteMoves.length === 0) {
-             continue;
-           }
-        }
-
-        const s = currentShogi.toSFENString(1);
-        applyMoveToShogi(currentShogi, move);
-        const res = search(depth - 1, false);
-        if (currentShogi.initializeFromSFENString) {
-          currentShogi.initializeFromSFENString(s);
-        } else {
-          currentShogi.initializeFromSFEN(s);
-        }
-
-        // If the deeper search timed out, we might not have found a mate, but it doesn't mean it's not mate.
-        if (res.timeout) {
-            timeout = true;
-            break;
-        }
-
-        if (res.mate) {
-          if (res.steps < bestSteps) {
-            bestSteps = res.steps;
-            bestMove = move;
-            mateCount = 1;
-          } else if (res.steps === bestSteps) {
-            mateCount++;
-          }
-        }
-      }
-
-      const finalRes = bestMove ? { steps: bestSteps + 1, mate: true, bestMove, mateCount, timeout } : { steps: 0, mate: false, bestMove: null, mateCount: 0, timeout };
-      memo.set(hash, finalRes);
-      return finalRes;
-
-    } else {
-      if (legalMoves.length === 0) {
-        const res = { steps: 0, mate: true, bestMove: null };
-        memo.set(hash, res);
-        return res;
-      }
-
-      let maxSteps = -1;
-      let minMateCount = Infinity;
-      let bestMoves: Move[] = [];
-      let escapeMoves: Move[] = [];
-
-      let timeout = false;
-
-      for (const move of legalMoves) {
-        if (Date.now() - startTime > TIME_LIMIT_MS) {
-            timeout = true;
-            break;
-        }
-
-        const s = currentShogi.toSFENString(1);
-        applyMoveToShogi(currentShogi, move);
-        const res = search(depth - 1, true);
-        if (currentShogi.initializeFromSFENString) {
-          currentShogi.initializeFromSFENString(s);
-        } else {
-          currentShogi.initializeFromSFEN(s);
-        }
-
-        if (res.timeout) {
-           timeout = true;
-           if (!res.mate) escapeMoves.push(move);
-           break;
-        }
-
-        if (!res.mate) {
-          escapeMoves.push(move);
-        } else {
-          const currentMateCount = res.mateCount || Infinity;
-          if (res.steps > maxSteps) {
-            maxSteps = res.steps;
-            minMateCount = currentMateCount;
-            bestMoves = [move];
-          } else if (res.steps === maxSteps) {
-            if (currentMateCount < minMateCount) {
-              minMateCount = currentMateCount;
-              bestMoves = [move];
-            } else if (currentMateCount === minMateCount) {
-              bestMoves.push(move);
-            }
-          }
-        }
-      }
-
-      const sfenKey = currentShogi.toSFENString(1);
-      const previousMoves = solvedAiMovesMap[sfenKey] || [];
-
-      const PIECE_VALUES: Record<string, number> = {
-        FU: 1, KY: 3, KE: 4, GI: 6, KI: 7, KA: 10, HI: 12,
-        TO: 7, NY: 7, NK: 7, NG: 7, UM: 12, RY: 14, OU: 1000
-      };
-
-      let goteKingPos = { x: 5, y: 1 };
-      for (let x = 1; x <= 9; x++) {
-        for (let y = 1; y <= 9; y++) {
-          const p = currentShogi.get(x, y);
-          if (p && p.kind === 'OU' && p.color === Color.White) {
-            goteKingPos = { x, y };
-          }
-        }
-      }
-
-      const evaluateMoveOption = (m: Move) => {
-         let score = 0;
-         if (m.from) {
-             const captured = currentShogi.get(m.to.x, m.to.y);
-             if (captured) {
-                score += (PIECE_VALUES[captured.kind] || 1) * 20; // Captures are still strictly good to prioritize
-             }
-         }
-         
-         // Only penalize used moves to ensure variation
-         const usedCount = previousMoves.filter(pm => 
-           m.from?.x === pm.from?.x && m.from?.y === pm.from?.y && m.to.x === pm.to.x && m.to.y === pm.to.y && m.piece === pm.piece && m.promote === pm.promote
-         ).length;
-         score -= usedCount * 1000;
-
-         return score + Math.random();
-      };
-
-      if (escapeMoves.length > 0) {
-        let bestEscape = escapeMoves[0];
-        let bestScore = -Infinity;
-
-        for (const m of escapeMoves) {
-          const score = evaluateMoveOption(m);
-          if (score > bestScore) {
-            bestScore = score;
-            bestEscape = m;
-          }
-        }
-
-        const escapeRes = { steps: 0, mate: false, bestMove: bestEscape, timeout };
-        memo.set(hash, escapeRes);
-        return escapeRes;
-      }
-
-      let randomBest = null;
-      if (bestMoves.length > 0) {
-        let bestDoomedMove = bestMoves[0];
-        let bestDoomedScore = -Infinity;
-
-        for (const m of bestMoves) {
-           const score = evaluateMoveOption(m);
-           if (score > bestDoomedScore) {
-               bestDoomedScore = score;
-               bestDoomedMove = m;
-           }
-        }
-        randomBest = bestDoomedMove;
-      }
-
-      const finalRes = { steps: maxSteps + 1, mate: true, bestMove: randomBest, timeout };
-      memo.set(hash, finalRes);
-      return finalRes;
-    }
-  }
-
-  return search(maxDepth, false);
-};
-
-interface DataSet {
-  id: string;
-  title: string;
-  appTitle: string;
-  problems: Problem[];
-  timestamp: number;
-}
 
 export default function App() {
   const defaultTitle = (problemsData as any).appTitle || '詰将棋マスター';
+  const defaultClearUrl = (problemsData as any).clearUrl || 'https://ais-pre-x5hnwaz6bcxstyuj6qxrfz-87151204104.asia-northeast1.run.app/complete?book=01';
   const [appTitle, setAppTitle] = useState(defaultTitle);
+  const [clearUrl, setClearUrl] = useState<string>(defaultClearUrl);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState('');
 
@@ -540,12 +37,10 @@ export default function App() {
       const newTitle = tempTitle.trim();
       setAppTitle(newTitle);
       localStorage.setItem('tsumeShogiAppTitle', newTitle);
-      // We will trigger a save to problems.json via the problems effect
-      // so we don't need a separate /api/settings fetch here.
       fetch('/api/problems', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appTitle: newTitle, problems })
+        body: JSON.stringify({ appTitle: newTitle, clearUrl, problems })
       }).catch(e => console.error("Failed to save title", e));
     }
     setIsEditingTitle(false);
@@ -575,6 +70,22 @@ export default function App() {
   const [solvedAiMovesMap, setSolvedAiMovesMap] = useState<Record<string, Move[]>>({});
   const [preferredAiMovesMap, setPreferredAiMovesMap] = useState<Record<string, Move>>({});
   const [solvedProblems, setSolvedProblems] = useState<number[]>([]);
+  const [answerImagesMap, setAnswerImagesMap] = useState<Record<string, string>>({});
+
+  const saveAnswerImagesMap = async (newMap: Record<string, string>) => {
+    setAnswerImagesMap(newMap);
+    try {
+      await setIDBValue('tsumeShogiAnswerImages', newMap);
+    } catch (e) {}
+    try {
+      localStorage.setItem('tsumeShogiAnswerImages', JSON.stringify(newMap));
+    } catch (e) {}
+    fetch('/api/answer-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newMap)
+    }).catch(() => {});
+  };
   
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -590,6 +101,91 @@ export default function App() {
   const [isToolbarOpen, setIsToolbarOpen] = useState(false);
   const [showStartupModal, setShowStartupModal] = useState(true);
   const [showProgressModal, setShowProgressModal] = useState(false);
+  const [showAnswerModal, setShowAnswerModal] = useState(false);
+  const answerFileInputRef = useRef<HTMLInputElement>(null);
+  const editAnswerFileInputRef = useRef<HTMLInputElement>(null);
+
+  const saveProblemsData = async (newProblems: Problem[], currentTitle = appTitle, currentClearUrl = clearUrl) => {
+    setProblems(newProblems);
+    try {
+      await setIDBValue('tsumeShogiProblems', newProblems);
+    } catch (e) {
+      console.warn("Could not save to IndexedDB:", e);
+    }
+
+    try {
+      localStorage.setItem('tsumeShogiProblems', JSON.stringify(newProblems));
+      if (currentClearUrl) {
+        localStorage.setItem('tsumeShogiClearUrl', currentClearUrl);
+      }
+    } catch (e) {
+      console.warn("Could not save to localStorage (quota exceeded):", e);
+    }
+
+    try {
+      await fetch('/api/problems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appTitle: currentTitle, clearUrl: currentClearUrl, problems: newProblems })
+      });
+    } catch (e) {
+      console.error("Failed to save problems to API:", e);
+    }
+  };
+
+  const handleAnswerImageUpload = async (file: File) => {
+    if (!file) return;
+    try {
+      setAlertDialog('画像を処理・圧縮しています...');
+      const dataUrl = await compressImage(file);
+      const targetProb = problems[currentProblemIndex];
+      if (!targetProb) return;
+
+      const updated = [...problems];
+      updated[currentProblemIndex] = {
+        ...targetProb,
+        answerImageUrl: dataUrl,
+      };
+
+      const newMap = { ...answerImagesMap };
+      if (targetProb.id) newMap[`id_${targetProb.id}`] = dataUrl;
+      if (targetProb.title) newMap[`title_${targetProb.title}`] = dataUrl;
+      if (targetProb.initialSfen) newMap[`sfen_${targetProb.initialSfen}`] = dataUrl;
+      newMap[`idx_${currentProblemIndex}`] = dataUrl;
+
+      await saveAnswerImagesMap(newMap);
+      await saveProblemsData(updated);
+      setAlertDialog('解答画像を登録し、保存しました。');
+    } catch (e) {
+      console.error("Image upload failed:", e);
+      setAlertDialog('解答画像の読み込みに失敗しました。');
+    }
+  };
+
+  const handleDeleteAnswerImage = () => {
+    setConfirmDialog({
+      message: 'この問題の解答画像を削除しますか？',
+      onConfirm: async () => {
+        const targetProb = problems[currentProblemIndex];
+        if (!targetProb) return;
+
+        const updated = [...problems];
+        const newProb = { ...targetProb };
+        delete newProb.answerImageUrl;
+        updated[currentProblemIndex] = newProb;
+
+        const newMap = { ...answerImagesMap };
+        if (targetProb.id) delete newMap[`id_${targetProb.id}`];
+        if (targetProb.title) delete newMap[`title_${targetProb.title}`];
+        if (targetProb.initialSfen) delete newMap[`sfen_${targetProb.initialSfen}`];
+        delete newMap[`idx_${currentProblemIndex}`];
+
+        await saveAnswerImagesMap(newMap);
+        await saveProblemsData(updated);
+        setAlertDialog('解答画像を削除しました。');
+      }
+    });
+  };
   
   const [isRandomOrder, setIsRandomOrder] = useState<boolean>(() => {
     return localStorage.getItem('tsumeShogiRandomOrder') === 'true';
@@ -623,27 +219,7 @@ export default function App() {
     setShowTimerFinished(false);
     setFailedProblemIds([]);
     setIsTimerReviewPhase(false);
-    
-    if (isRandomOrder) {
-      const unsolvedEntries = problems
-        .map((p, idx) => ({ idx, id: p.id, resets: resetCounts[p.id] || 0 }))
-        .filter(entry => !solvedProblems.includes(entry.id));
-
-      if (unsolvedEntries.length > 0) {
-        const minResets = Math.min(...unsolvedEntries.map(e => e.resets));
-        const candidateIndices = unsolvedEntries.filter(e => e.resets === minResets).map(e => e.idx);
-        const randomIndex = candidateIndices[Math.floor(Math.random() * candidateIndices.length)];
-        setCurrentProblemIndex(randomIndex);
-      } else {
-        if (problems.length > 0) {
-          setCurrentProblemIndex(Math.floor(Math.random() * problems.length));
-        } else {
-          setCurrentProblemIndex(0);
-        }
-      }
-    } else {
-      setCurrentProblemIndex(0);
-    }
+    setResetTrigger(prev => prev + 1);
   };
 
   const stopTimer = () => {
@@ -652,29 +228,25 @@ export default function App() {
   };
 
   const loadDataSetFromStartup = async (dataset: DataSet) => {
-    setProblems(dataset.problems);
+    const problemsWithImages = attachAnswerImages(dataset.problems, answerImagesMap);
+    setProblems(problemsWithImages);
     setAppTitle(dataset.appTitle);
     localStorage.setItem('tsumeShogiAppTitle', dataset.appTitle);
     
+    const nextClearUrl = dataset.clearUrl || defaultClearUrl;
+    setClearUrl(nextClearUrl);
+    localStorage.setItem('tsumeShogiClearUrl', nextClearUrl);
+
     const shouldRandom = localStorage.getItem('tsumeShogiRandomOrder') === 'true';
-    if (shouldRandom && dataset.problems.length > 0) {
-      setCurrentProblemIndex(Math.floor(Math.random() * dataset.problems.length));
+    if (shouldRandom && problemsWithImages.length > 0) {
+      setCurrentProblemIndex(Math.floor(Math.random() * problemsWithImages.length));
     } else {
       setCurrentProblemIndex(0);
     }
     
     setResetTrigger(prev => prev + 1);
     
-    // Sync app mode problems back to server
-    try {
-      await fetch('/api/problems', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appTitle: dataset.appTitle, problems: dataset.problems })
-      });
-    } catch (e) {
-      console.error("Failed to save loaded dataset to current problems server state", e);
-    }
+    saveProblemsData(problemsWithImages, dataset.appTitle, nextClearUrl);
 
     setAlertDialog('データを読み込みました。');
     setShowStartupModal(false);
@@ -695,6 +267,7 @@ export default function App() {
       id: Date.now().toString(),
       title: `${appTitle} (${new Date().toLocaleDateString()})`,
       appTitle: appTitle,
+      clearUrl: clearUrl,
       problems: currentDataToCopy,
       timestamp: Date.now()
     };
@@ -703,7 +276,6 @@ export default function App() {
     setSavedDataSets(updated);
     localStorage.setItem('tsumeShogiSavedDataSets', JSON.stringify(updated));
 
-    // Save to server
     try {
       await fetch('/api/datasets', {
         method: 'POST',
@@ -722,29 +294,25 @@ export default function App() {
     setConfirmDialog({
       message: `「${dataset.title}」を読み込みますか？現在のデータは上書きされます。`,
       onConfirm: async () => {
-        setProblems(dataset.problems);
+        const problemsWithImages = attachAnswerImages(dataset.problems, answerImagesMap);
+        setProblems(problemsWithImages);
         setAppTitle(dataset.appTitle);
         localStorage.setItem('tsumeShogiAppTitle', dataset.appTitle);
         
+        const nextClearUrl = dataset.clearUrl || defaultClearUrl;
+        setClearUrl(nextClearUrl);
+        localStorage.setItem('tsumeShogiClearUrl', nextClearUrl);
+
         const shouldRandom = localStorage.getItem('tsumeShogiRandomOrder') === 'true';
-        if (shouldRandom && dataset.problems.length > 0) {
-          setCurrentProblemIndex(Math.floor(Math.random() * dataset.problems.length));
+        if (shouldRandom && problemsWithImages.length > 0) {
+          setCurrentProblemIndex(Math.floor(Math.random() * problemsWithImages.length));
         } else {
           setCurrentProblemIndex(0);
         }
         
         setResetTrigger(prev => prev + 1);
         
-        // Sync app mode problems back to server
-        try {
-          await fetch('/api/problems', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ appTitle: dataset.appTitle, problems: dataset.problems })
-          });
-        } catch (e) {
-          console.error("Failed to save loaded dataset to current problems server state", e);
-        }
+        saveProblemsData(problemsWithImages, dataset.appTitle, nextClearUrl);
 
         setAlertDialog('データを読み込みました。');
       }
@@ -774,8 +342,32 @@ export default function App() {
 
   useEffect(() => {
     const fetchProblems = async () => {
+      let serverImages: Record<string, string> = {};
+      try {
+        const res = await fetch('/api/answer-images');
+        if (res.ok) {
+          serverImages = await res.json();
+        }
+      } catch (e) {}
+
+      let idbImages: Record<string, string> = {};
+      try {
+        const idbVal = await getIDBValue<Record<string, string>>('tsumeShogiAnswerImages');
+        if (idbVal && typeof idbVal === 'object') idbImages = idbVal;
+      } catch (e) {}
+
+      let localImages: Record<string, string> = {};
+      try {
+        const savedImg = localStorage.getItem('tsumeShogiAnswerImages');
+        if (savedImg) localImages = JSON.parse(savedImg);
+      } catch (e) {}
+
+      const combinedImageMap = { ...serverImages, ...idbImages, ...localImages };
+      setAnswerImagesMap(combinedImageMap);
+
       let apiProblems: Problem[] | null = null;
       let apiAppTitle: string | null = null;
+      let apiClearUrl: string | null = null;
       try {
         const res = await fetch('/api/problems');
         if (res.ok) {
@@ -785,6 +377,7 @@ export default function App() {
           } else if (data && data.problems && data.problems.length > 0) {
             apiProblems = data.problems;
             if (data.appTitle) apiAppTitle = data.appTitle;
+            if (data.clearUrl) apiClearUrl = data.clearUrl;
           }
         }
       } catch (e) {
@@ -797,6 +390,21 @@ export default function App() {
       } else {
         const localTitle = localStorage.getItem('tsumeShogiAppTitle');
         if (localTitle) setAppTitle(localTitle);
+      }
+
+      if (apiClearUrl) {
+        setClearUrl(apiClearUrl);
+        localStorage.setItem('tsumeShogiClearUrl', apiClearUrl);
+      } else {
+        const localClearUrl = localStorage.getItem('tsumeShogiClearUrl');
+        if (localClearUrl) setClearUrl(localClearUrl);
+      }
+
+      let idbProblems: Problem[] | null = null;
+      try {
+        idbProblems = await getIDBValue<Problem[]>('tsumeShogiProblems');
+      } catch (e) {
+        console.warn("Failed to read from IndexedDB", e);
       }
 
       const saved = localStorage.getItem('tsumeShogiProblems');
@@ -822,16 +430,13 @@ export default function App() {
           }
         }
         
-        // Merge datasetsJson with API data to ensure src/data/datasets.json is always available
         const localSources = Array.isArray(datasetsJson) ? datasetsJson : [];
         const mergedMap = new Map();
         
-        // Add JSON file datasets first
         localSources.forEach((ds: any) => {
           if (ds && ds.id) mergedMap.set(ds.id, ds);
         });
         
-        // Override with API datasets (user modifications/saves)
         fetchedDataSets.forEach((ds: any) => {
           if (ds && ds.id) mergedMap.set(ds.id, ds);
         });
@@ -841,9 +446,7 @@ export default function App() {
         if (finalDatasets.length > 0) {
           setSavedDataSets(finalDatasets);
           localStorage.setItem('tsumeShogiSavedDataSets', JSON.stringify(finalDatasets));
-          // Don't auto-post back to api/datasets here unless necessary to prevent accidental overwrites of datasets.json
         } else {
-          // Fallback to local storage if somehow empty
           const savedSets = localStorage.getItem('tsumeShogiSavedDataSets');
           if (savedSets) {
             try {
@@ -856,7 +459,6 @@ export default function App() {
         }
       } catch (e) {
         console.error("Failed to fetch datasets", e);
-        // Fallback merging local json and local storage
         const localSources = Array.isArray(datasetsJson) ? datasetsJson : [];
         const mergedMap = new Map();
         localSources.forEach((ds: any) => {
@@ -877,33 +479,48 @@ export default function App() {
         setSavedDataSets(Array.from(mergedMap.values()));
       }
 
-      // Always trust API data over INITIAL_PROBLEMS
-      const hasLocalData = localProblems && localProblems.length > 0;
-      let loadedProblems = INITIAL_PROBLEMS;
-      
-      if (apiProblems && apiProblems.length > 0) {
-        setProblems(apiProblems);
-        loadedProblems = apiProblems;
-        localStorage.setItem('tsumeShogiProblems', JSON.stringify(apiProblems));
-      } else if (hasLocalData) {
-        setProblems(localProblems!);
-        loadedProblems = localProblems!;
-        // Sync to API so server is updated again
-        fetch('/api/problems', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appTitle: apiAppTitle || defaultTitle, problems: localProblems })
-        }).catch(() => {});
-      } else {
-        setProblems(INITIAL_PROBLEMS);
-        localStorage.setItem('tsumeShogiProblems', JSON.stringify(INITIAL_PROBLEMS));
-        // Seed API
-        fetch('/api/problems', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ appTitle: apiAppTitle || defaultTitle, problems: INITIAL_PROBLEMS })
-        }).catch(() => {});
-      }
+      const baseList = (apiProblems && apiProblems.length > 0) ? apiProblems :
+                       (idbProblems && idbProblems.length > 0) ? idbProblems :
+                       (localProblems && localProblems.length > 0) ? localProblems :
+                       INITIAL_PROBLEMS;
+
+      const allSources = [apiProblems, idbProblems, localProblems].filter(Boolean) as Problem[][];
+      const mergedProblems = baseList.map((prob, idx) => {
+        let answerImageUrl = prob.answerImageUrl;
+        if (!answerImageUrl) {
+          for (const source of allSources) {
+            const match = source.find(p => p.id === prob.id || p.title === prob.title || source.indexOf(p) === idx);
+            if (match && match.answerImageUrl) {
+              answerImageUrl = match.answerImageUrl;
+              break;
+            }
+          }
+        }
+        if (!answerImageUrl && combinedImageMap) {
+          answerImageUrl = combinedImageMap[`id_${prob.id}`] ||
+                           (prob.title ? combinedImageMap[`title_${prob.title}`] : undefined) ||
+                           (prob.initialSfen ? combinedImageMap[`sfen_${prob.initialSfen}`] : undefined) ||
+                           combinedImageMap[`idx_${idx}`];
+        }
+        return {
+          ...prob,
+          answerImageUrl
+        };
+      });
+
+      setProblems(mergedProblems);
+      let loadedProblems = mergedProblems;
+
+      setIDBValue('tsumeShogiProblems', mergedProblems).catch(() => {});
+      try {
+        localStorage.setItem('tsumeShogiProblems', JSON.stringify(mergedProblems));
+      } catch (e) {}
+
+      fetch('/api/problems', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ appTitle: apiAppTitle || defaultTitle, problems: mergedProblems })
+      }).catch(() => {});
       
       const shouldRandom = localStorage.getItem('tsumeShogiRandomOrder') === 'true';
       if (shouldRandom && loadedProblems.length > 0) {
@@ -915,13 +532,21 @@ export default function App() {
     fetchProblems();
   }, []);
 
-  // Debounced auto-save to API and localStorage
   useEffect(() => {
     if (isLoadingProblems || problems.length === 0) return;
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       setIsSaving(true);
-      localStorage.setItem('tsumeShogiProblems', JSON.stringify(problems));
+
+      try {
+        await setIDBValue('tsumeShogiProblems', problems);
+      } catch (e) {}
+
+      try {
+        localStorage.setItem('tsumeShogiProblems', JSON.stringify(problems));
+      } catch (e) {
+        console.warn("Could not cache problems to localStorage (quota exceeded):", e);
+      }
       
       fetch('/api/problems', {
         method: 'POST',
@@ -936,13 +561,12 @@ export default function App() {
         console.error("Failed to save problems to API", e);
       })
       .finally(() => {
-        // Show "Saved" for a moment
         setTimeout(() => setIsSaving(false), 800);
       });
-    }, 1000); // 1 second debounce
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [problems, isLoadingProblems]);
+  }, [problems, isLoadingProblems, appTitle]);
 
   const currentProblem = problems[currentProblemIndex];
 
@@ -1021,7 +645,6 @@ export default function App() {
 
   const toggleEditMode = () => {
     if (isEditMode) {
-      // Exiting edit mode, just save the new SFEN
       setSelectedSquare(null);
       const newSfen = shogi.toSFENString(1);
       const updatedProblems = [...problems];
@@ -1129,6 +752,7 @@ export default function App() {
     try {
       const exportData = {
         appTitle,
+        clearUrl,
         problems: currentDataToCopy
       };
       await navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
@@ -1149,10 +773,12 @@ export default function App() {
         const parsed = JSON.parse(text);
         let importedProblems = parsed;
         let importedTitle = null;
+        let importedClearUrl = null;
 
         if (!Array.isArray(parsed) && parsed.problems) {
           importedProblems = parsed.problems;
           if (parsed.appTitle) importedTitle = parsed.appTitle;
+          if (parsed.clearUrl) importedClearUrl = parsed.clearUrl;
         }
 
         if (Array.isArray(importedProblems) && importedProblems.length > 0 && typeof importedProblems[0].id !== 'undefined') {
@@ -1164,6 +790,10 @@ export default function App() {
                 setAppTitle(importedTitle);
                 localStorage.setItem('tsumeShogiAppTitle', importedTitle);
               }
+              if (importedClearUrl) {
+                setClearUrl(importedClearUrl);
+                localStorage.setItem('tsumeShogiClearUrl', importedClearUrl);
+              }
               const shouldRandom = localStorage.getItem('tsumeShogiRandomOrder') === 'true';
               if (shouldRandom && importedProblems.length > 0) {
                 setCurrentProblemIndex(Math.floor(Math.random() * importedProblems.length));
@@ -1171,6 +801,7 @@ export default function App() {
                 setCurrentProblemIndex(0);
               }
               setResetTrigger(prev => prev + 1);
+              saveProblemsData(importedProblems, importedTitle || appTitle, importedClearUrl || clearUrl);
               setAlertDialog('データをインポートしました。');
             }
           });
@@ -1296,7 +927,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
       let parsedResults: { sfen: string, description: string, goteHandSpecified?: boolean }[] = [];
       try {
         parsedResults = JSON.parse(jsonStr);
-        // 以前の、文字列配列だけが返ってきた場合のフォールバック（念のため）
         if (parsedResults.length > 0 && typeof parsedResults[0] === 'string') {
           parsedResults = (parsedResults as unknown as string[]).map(sfen => ({ sfen, description: '', goteHandSpecified: false }));
         }
@@ -1379,7 +1009,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
     try {
       const newShogi = new Shogi();
       
-      // 常に先手番からスタートするようにSFENを書き換える
       let initialSfen = currentProblem.initialSfen;
       if (initialSfen.includes(' w ')) {
         initialSfen = initialSfen.replace(' w ', ' b ');
@@ -1393,7 +1022,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         }
       } catch (sfenError) {
         console.error("Invalid SFEN:", initialSfen);
-        // Initialize with empty board if SFEN is invalid
         if (newShogi.initializeFromSFENString) {
           newShogi.initializeFromSFENString("9/9/9/9/9/9/9/9/9 b - 1");
         } else {
@@ -1451,8 +1079,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
   useEffect(() => {
     resetGame();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentProblem?.id, currentProblemIndex, resetTrigger]);
+  }, [currentProblem?.id, currentProblemIndex, resetTrigger, resetGame]);
 
   if (isLoadingProblems) {
     return (
@@ -1516,14 +1143,12 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
       } else {
         if (selectedSquare) {
           if (selectedSquare.x === x && selectedSquare.y === y) {
-            // Flip color if the same piece is clicked again
             const piece = shogi.get(x, y);
             if (piece) {
               shogi.board[x - 1][y - 1] = new Piece(piece.color === Color.Black ? '-' + piece.kind : '+' + piece.kind);
             }
             setSelectedSquare(null);
           } else {
-            // Swap piece to the new square (moving it if empty, swapping if occupied)
             const pieceToMove = shogi.get(selectedSquare.x, selectedSquare.y);
             const targetPiece = shogi.get(x, y);
             shogi.board[selectedSquare.x - 1][selectedSquare.y - 1] = targetPiece;
@@ -1531,11 +1156,10 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
             setSelectedSquare(null);
           }
         } else {
-          // Select piece to move or flip
           if (shogi.get(x, y)) {
             setSelectedSquare({ x, y });
           }
-          return; // Wait for the next click
+          return;
         }
       }
       setShogi(cloneShogi(shogi));
@@ -1590,7 +1214,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
         setSelectedSquare(null);
       }
     } else {
-      // Select a piece on the board
       const turnColor = isGoteManualEntry ? Color.White : Color.Black;
       const piece = shogi.get(x, y);
       if (piece && piece.color === turnColor) {
@@ -1780,7 +1403,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                 </div>
               </motion.div>
             )}
-            {/* Coordinates for edge cells */}
           </div>
         );
       }
@@ -1963,7 +1585,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
           
           <div className="flex justify-center items-center gap-2 sm:gap-4 mx-1 sm:mx-2">
             <h2 className="text-base sm:text-lg md:text-xl font-bold text-white whitespace-nowrap">
-              {solvedProblems.includes(currentProblem.id) ? '🔴 ' : ''}{currentProblem.title}
+              {solvedProblems.includes(currentProblem?.id) ? '🔴 ' : ''}{currentProblem?.title}
             </h2>
             <span className="font-bold px-3 py-1 bg-[#2A4C3A] rounded-full text-xs sm:text-sm whitespace-nowrap text-white">
               問題 {currentProblemIndex + 1} / {problems.length}
@@ -1992,7 +1614,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
       <main className={`flex-1 w-full min-h-0 flex flex-col items-center p-2 relative ${isEditMode ? 'overflow-y-auto pb-32' : 'overflow-hidden'}`}>
         <div className={`w-full max-w-lg flex flex-col gap-1 sm:gap-2 items-center justify-start pt-1 sm:pt-2 ${isEditMode ? 'overflow-visible h-auto min-h-full' : 'overflow-hidden h-full'}`}>
-          {/* Gote Hand (Top) */}
             <div className="w-full max-w-full sm:max-w-[480px] flex flex-row px-0 sm:px-2">
               <div className="w-full bg-[#D1A15B] p-1 sm:p-3 rounded-lg sm:rounded-xl border border-[#D1A15B] min-h-[40px] flex flex-row items-center gap-2 sm:gap-4 shadow-sm">
                 <h3 className="text-xs sm:text-sm font-bold text-black whitespace-nowrap ml-1 sm:ml-0">後手</h3>
@@ -2002,7 +1623,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               </div>
             </div>
 
-            {/* Board */}
             <div className="flex flex-col items-center w-full">
               <div className={`relative w-full max-w-[min(100vw-16px,50vh)] p-0 sm:p-2 sm:rounded-lg shadow-sm sm:shadow-2xl flex-shrink-0 transition-colors ${isEditMode ? 'bg-[#D1A15B] border-4 border-amber-500' : 'bg-[#D1A15B] border-2 sm:border-4 border-[#D1A15B]'}`}>
                 {isEditMode && (
@@ -2032,7 +1652,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               </div>
             </div>
 
-            {/* Sente Hand (Bottom) */}
             <div className="w-full max-w-full sm:max-w-[480px] flex flex-row px-0 sm:px-2">
               <div className="w-full bg-[#D1A15B] p-1 sm:p-3 rounded-lg sm:rounded-xl border border-[#D1A15B] min-h-[40px] flex flex-row items-center gap-2 sm:gap-4 shadow-sm">
                 <h3 className="text-xs sm:text-sm font-bold text-black whitespace-nowrap ml-1 sm:ml-0">先手</h3>
@@ -2042,8 +1661,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               </div>
             </div>
             
-            {/* Message Area moved below Sente Hand */}
-              <div className={`
+            <div className={`
               w-full max-w-full sm:max-w-[480px] p-2 sm:p-4 rounded-lg sm:rounded-xl text-center font-bold text-sm sm:text-lg transition-all duration-300 mx-2 sm:mx-0 shadow-sm
               ${isGameOver ? 'bg-green-100 text-green-800 scale-105' : 'bg-[#FFF9E6] border border-[#E8DCC0] text-[#5A4A32]'}
             `}>
@@ -2056,7 +1674,20 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                     次の問題へ <ChevronRight size={18} />
                   </button>
                 ) : (
-                  <span className="text-green-800 text-sm sm:text-base block py-2">全問クリア！おめでとうございます🎉</span>
+                  <div className="flex flex-col items-center gap-2 py-1">
+                    <span className="text-green-800 text-sm sm:text-base font-bold">全問クリア！おめでとうございます🎉</span>
+                    {clearUrl && (
+                      <a
+                        href={clearUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-2 px-6 rounded-lg font-bold text-sm sm:text-base transition-all shadow-md mt-1 cursor-pointer no-underline"
+                      >
+                        <ExternalLink size={18} />
+                        クリア登録
+                      </a>
+                    )}
+                  </div>
                 )
               ) : (
                 message
@@ -2109,16 +1740,24 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               >
                 後手の手を変える
               </button>
+              <button
+                onClick={() => setShowAnswerModal(true)}
+                className={`flex-1 flex items-center justify-center gap-1 sm:gap-2 ${currentProblem?.answerImageUrl ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-stone-700 hover:bg-stone-800'} text-white py-1.5 sm:py-3 rounded-lg sm:rounded-xl font-bold text-xs sm:text-base transition-colors shadow-sm active:scale-95 relative`}
+              >
+                <Eye size={14} className="sm:w-[18px] sm:h-[18px]" />
+                解答
+                {currentProblem?.answerImageUrl && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 border border-white rounded-full"></span>
+                )}
+              </button>
             </div>
 
-            {/* Comment Section below buttons */}
             <div className="w-full max-w-[600px] px-2 sm:px-0 mt-1 text-center z-10 shrink-0">
-              <p className="text-sm sm:text-base text-stone-900 truncate font-bold bg-white/60 p-2 sm:p-3 rounded-xl border border-stone-800/10 shadow-sm" title={currentProblem.description || "解説はありません"}>
-                {currentProblem.description || "解説はありません"}
+              <p className="text-sm sm:text-base text-stone-900 truncate font-bold bg-white/60 p-2 sm:p-3 rounded-xl border border-stone-800/10 shadow-sm" title={currentProblem?.description || "解説はありません"}>
+                {currentProblem?.description || "解説はありません"}
               </p>
             </div>
 
-          {/* Edit Palette */}
           {isEditMode && (
             <div className="w-full max-w-[600px] px-2 sm:px-0 flex flex-col gap-4">
               <div className="bg-white/80 p-4 rounded-xl border border-stone-400 shadow-sm space-y-4">
@@ -2161,6 +1800,67 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       rows={3}
                       placeholder="問題の説明を入力してください"
                     />
+                  </div>
+                  <div className="space-y-2 pt-2 border-t border-stone-200">
+                    <label className="text-xs font-bold text-stone-700 block uppercase tracking-wider">解答画像（スクリーンショット）</label>
+                    {currentProblem.answerImageUrl ? (
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 bg-white border border-stone-300 rounded-xl">
+                        <img
+                          src={currentProblem.answerImageUrl}
+                          alt="解答プレビュー"
+                          className="w-24 h-24 object-contain rounded-lg border border-stone-200 bg-stone-50"
+                        />
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs text-stone-600 font-bold">解答画像が登録されています</span>
+                          <div className="flex gap-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              ref={editAnswerFileInputRef}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleAnswerImageUpload(file);
+                                if (e.target) e.target.value = '';
+                              }}
+                            />
+                            <button
+                              onClick={() => editAnswerFileInputRef.current?.click()}
+                              className="px-3 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                            >
+                              <Upload size={14} /> 変更
+                            </button>
+                            <button
+                              onClick={handleDeleteAnswerImage}
+                              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                            >
+                              <Trash2 size={14} /> 削除
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-white border border-stone-300 rounded-xl flex items-center justify-between">
+                        <span className="text-xs text-stone-500">解答画像は未登録です</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          ref={editAnswerFileInputRef}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleAnswerImageUpload(file);
+                            if (e.target) e.target.value = '';
+                          }}
+                        />
+                        <button
+                          onClick={() => editAnswerFileInputRef.current?.click()}
+                          className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                        >
+                          <Upload size={14} /> 解答画像を登録
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2230,7 +1930,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
 
       {/* Floating Toolbar Toggle */}
       <div className="absolute bottom-4 right-4 sm:bottom-8 sm:right-8 flex flex-col items-end gap-2 sm:gap-3 z-20 pointer-events-none">
-        
         <button
           onClick={() => setShowProgressModal(true)}
           className="mb-10 sm:mb-12 w-12 h-12 sm:w-14 sm:h-14 bg-stone-50 text-stone-800 border-2 border-amber-600 rounded-full shadow-lg flex items-center justify-center hover:bg-stone-200 hover:scale-105 active:scale-95 transition-all flex-shrink-0 pointer-events-auto"
@@ -2311,13 +2010,26 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                    })}
                  </div>
               </div>
-              <div className="p-4 bg-stone-50/50 border-t border-stone-800/10 flex items-center justify-center gap-8">
-                <span className="text-sm font-bold text-stone-800">
-                  正解：{solvedProblems.length}問 / {problems.length}
-                </span>
-                <span className="text-sm font-bold text-stone-800">
-                  間違えた回数: {Object.values(resetCounts).reduce((a, b) => (a as number) + (b as number), 0)}回
-                </span>
+              <div className="p-4 bg-stone-50/50 border-t border-stone-800/10 flex flex-col items-center gap-3">
+                <div className="flex items-center justify-center gap-8 w-full">
+                  <span className="text-sm font-bold text-stone-800">
+                    正解：{solvedProblems.length}問 / {problems.length}
+                  </span>
+                  <span className="text-sm font-bold text-stone-800">
+                    間違えた回数: {Object.values(resetCounts).reduce((a, b) => (a as number) + (b as number), 0)}回
+                  </span>
+                </div>
+                {solvedProblems.length > 0 && solvedProblems.length === problems.length && clearUrl && (
+                  <a
+                    href={clearUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white py-2 px-4 rounded-xl font-bold text-sm shadow-md transition-all no-underline"
+                  >
+                    <ExternalLink size={16} />
+                    全問クリア！クリア登録はこちら
+                  </a>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -2353,8 +2065,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
               </div>
 
               <div className="p-4 sm:p-6 space-y-6">
-
-                {/* App Title Setting */}
                 <section className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-2">
                   <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">アプリのタイトル</label>
                   <input
@@ -2364,12 +2074,32 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                       setAppTitle(e.target.value);
                       localStorage.setItem('tsumeShogiAppTitle', e.target.value);
                     }}
+                    onBlur={() => {
+                      saveProblemsData(problems, appTitle, clearUrl);
+                    }}
                     className="w-full text-lg font-bold p-2 border border-stone-400 rounded-lg bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500"
                     placeholder="アプリのタイトル"
                   />
                 </section>
 
-                {/* Info Column Restored */}
+                <section className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-2">
+                  <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">クリア登録URL（全問クリア時のリンク先）</label>
+                  <input
+                    type="text"
+                    value={clearUrl}
+                    onChange={(e) => {
+                      setClearUrl(e.target.value);
+                      localStorage.setItem('tsumeShogiClearUrl', e.target.value);
+                    }}
+                    onBlur={() => {
+                      saveProblemsData(problems, appTitle, clearUrl);
+                    }}
+                    className="w-full text-sm font-mono p-2 border border-stone-400 rounded-lg bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-stone-500"
+                    placeholder="https://.../complete?book=01"
+                  />
+                  <span className="text-[11px] text-stone-600">全問正解時に表示される「クリア登録」ボタンの遷移先URLです。問題データや保存データセットに一緒にJSON保存されます。</span>
+                </section>
+
                 <section className="bg-white/60 p-4 sm:p-6 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
                   {isEditMode ? (
                     <div className="flex items-center justify-center p-4">
@@ -2378,7 +2108,7 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                   ) : (
                     <>
                       <p className="text-stone-800 leading-relaxed whitespace-pre-wrap border-b border-stone-800/10 pb-4">
-                        {currentProblem.description}
+                        {currentProblem?.description}
                       </p>
                       <div className="flex justify-end">
                         <button 
@@ -2416,7 +2146,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                   )}
                 </AnimatePresence>
 
-                {/* App Settings Section */}
                 <section className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
@@ -2436,7 +2165,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                   </div>
                 </section>
 
-                {/* In-App Data Section */}
                 <div className="w-full">
                   <div className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col gap-4">
                     <div className="flex items-center gap-2 text-stone-800">
@@ -2504,7 +2232,6 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                   </div>
                 </div>
 
-                {/* Upload Section */}
                 <div className="w-full mt-4">
                   <div className="bg-white/60 p-4 rounded-xl border border-stone-300 shadow-sm flex flex-col items-center justify-between gap-4">
                     <div className="flex flex-col items-start gap-4 text-stone-800 w-full">
@@ -2723,6 +2450,200 @@ SFEN形式の例: 7nl/1R3sk2/5pppp/9/9/9/9/9/9 b GS 1
                   className="px-6 py-2 bg-white border border-stone-400 text-stone-800 font-bold rounded-lg hover:bg-stone-200 transition-colors shadow-sm"
                 >
                   ランダムで選択
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Answer Image Modal */}
+      <AnimatePresence>
+        {showAnswerModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-3 sm:p-4 backdrop-blur-sm"
+            onClick={() => setShowAnswerModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              <div className="p-4 border-b border-stone-200 flex justify-between items-center bg-stone-50">
+                <div className="flex items-center gap-2">
+                  <Image className="w-5 h-5 text-emerald-700" />
+                  <h3 className="font-bold text-stone-800 text-base sm:text-lg">
+                    {currentProblem?.title} - 解答画像
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowAnswerModal(false)}
+                  className="p-1.5 bg-stone-200 rounded-full text-stone-800 hover:bg-stone-300 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-stone-100 min-h-[250px]">
+                {currentProblem?.answerImageUrl ? (
+                  <div className="relative w-full flex flex-col items-center gap-3">
+                    <img
+                      src={currentProblem.answerImageUrl}
+                      alt={`${currentProblem.title}の解答画像`}
+                      className="max-w-full max-h-[65vh] object-contain rounded-lg shadow-md border border-stone-300 bg-white"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center p-6 bg-white rounded-xl border border-stone-300 shadow-sm max-w-md w-full">
+                    <FileImage className="w-16 h-16 text-stone-400" />
+                    <div>
+                      <p className="font-bold text-stone-800 text-base sm:text-lg mb-1">
+                        解答画像が未登録です
+                      </p>
+                      <p className="text-xs sm:text-sm text-stone-600">
+                        この問題の解答（スクリーンショット）画像を登録すると、ここでいつでも確認できます。
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={answerFileInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAnswerImageUpload(file);
+                        if (e.target) e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => answerFileInputRef.current?.click()}
+                      className="flex items-center gap-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-5 py-2.5 rounded-xl transition-colors shadow-sm cursor-pointer"
+                    >
+                      <Upload size={18} />
+                      解答画像を登録する
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 sm:p-4 bg-stone-50 border-t border-stone-200 flex flex-wrap items-center justify-between gap-2">
+                {currentProblem?.answerImageUrl ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={answerFileInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAnswerImageUpload(file);
+                        if (e.target) e.target.value = '';
+                      }}
+                    />
+                    <button
+                      onClick={() => answerFileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-lg text-xs sm:text-sm font-bold transition-colors"
+                    >
+                      <Upload size={16} />
+                      画像を変更
+                    </button>
+                    <button
+                      onClick={handleDeleteAnswerImage}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs sm:text-sm font-bold transition-colors"
+                    >
+                      <Trash2 size={16} />
+                      削除
+                    </button>
+                  </div>
+                ) : (
+                  <div></div>
+                )}
+                <button
+                  onClick={() => setShowAnswerModal(false)}
+                  className="px-5 py-2 bg-stone-800 hover:bg-stone-900 text-white rounded-lg font-bold text-xs sm:text-sm transition-colors ml-auto"
+                >
+                  閉じる
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Alert Dialog Modal */}
+      <AnimatePresence>
+        {alertDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setAlertDialog(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center gap-4 text-center border border-stone-200"
+            >
+              <Info className="w-10 h-10 text-emerald-700" />
+              <p className="text-stone-800 font-bold whitespace-pre-wrap leading-relaxed text-sm sm:text-base">
+                {alertDialog}
+              </p>
+              <button
+                onClick={() => setAlertDialog(null)}
+                className="w-full py-2.5 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-bold text-sm transition-colors shadow-sm"
+              >
+                OK
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Confirm Dialog Modal */}
+      <AnimatePresence>
+        {confirmDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
+            onClick={() => setConfirmDialog(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl flex flex-col items-center gap-4 text-center border border-stone-200"
+            >
+              <AlertCircle className="w-10 h-10 text-amber-600" />
+              <p className="text-stone-800 font-bold whitespace-pre-wrap leading-relaxed text-sm sm:text-base">
+                {confirmDialog.message}
+              </p>
+              <div className="flex gap-3 w-full mt-2">
+                <button
+                  onClick={() => setConfirmDialog(null)}
+                  className="flex-1 py-2.5 bg-stone-200 hover:bg-stone-300 text-stone-800 rounded-xl font-bold text-sm transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={() => {
+                    const action = confirmDialog.onConfirm;
+                    setConfirmDialog(null);
+                    action();
+                  }}
+                  className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm transition-colors shadow-sm"
+                >
+                  実行する
                 </button>
               </div>
             </motion.div>
